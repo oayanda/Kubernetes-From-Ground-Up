@@ -88,7 +88,7 @@ aws ec2 modify-vpc-attribute \
  # 5. Set the required region
  AWS_REGION=eu-central-1
  ```
-  ![cssl installation](./images/6.png)
+![cssl installation](./images/6.png)
  ![cssl installation](./images/5.png)
 
 ***Dynamic Host Configuration Protocol – DHCP***
@@ -107,6 +107,48 @@ DHCP_OPTION_SET_ID=$(aws ec2 create-dhcp-options \
 aws ec2 create-tags \
   --resources ${DHCP_OPTION_SET_ID} \
   --tags Key=Name,Value=${NAME}
+
 ```
 
 ![cssl installation](./images/7.png)
+
+```bash
+# 8. Associate the DHCP Option set with the VPC:
+aws ec2 associate-dhcp-options \
+  --dhcp-options-id ${DHCP_OPTION_SET_ID} \
+  --vpc-id ${VPC_ID}
+  ```
+
+![cssl installation](./images/8.png)
+
+```bash
+# 9 Create the Subnet
+SUBNET_ID=$(aws ec2 create-subnet \
+  --vpc-id ${VPC_ID} \
+  --cidr-block 172.33.0.0/24 \
+  --output text --query 'Subnet.SubnetId')
+
+# 10. Add tag to Subnet
+aws ec2 create-tags \
+  --resources ${SUBNET_ID} \
+  --tags Key=Name,Value=${NAME}
+```
+
+![cssl installation](./images/9.png)
+
+```bash
+# 11. Create the Internet Gateway and attach it to the VPC
+INTERNET_GATEWAY_ID=$(aws ec2 create-internet-gateway \
+  --output text --query 'InternetGateway.InternetGatewayId')
+
+# 12. Tag Internet gateway  
+aws ec2 create-tags \
+  --resources ${INTERNET_GATEWAY_ID} \
+  --tags Key=Name,Value=${NAME}
+
+# 13. Attach Internet Gateway to VPC
+aws ec2 attach-internet-gateway \
+  --internet-gateway-id ${INTERNET_GATEWAY_ID} \
+  --vpc-id ${VPC_ID}
+```
+![cssl installation](./images/10.png)
