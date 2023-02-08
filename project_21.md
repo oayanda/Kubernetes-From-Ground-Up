@@ -152,3 +152,33 @@ aws ec2 attach-internet-gateway \
   --vpc-id ${VPC_ID}
 ```
 ![cssl installation](./images/10.png)
+
+```bash
+# 14. Create route tables
+
+ROUTE_TABLE_ID=$(aws ec2 create-route-table \
+  --vpc-id ${VPC_ID} \
+  --output text --query 'RouteTable.RouteTableId')
+
+# 15. Tag the route table
+
+aws ec2 create-tags \
+  --resources ${ROUTE_TABLE_ID} \
+  --tags Key=Name,Value=${NAME}
+
+# 16. Associate the route table to subnet
+
+aws ec2 associate-route-table \
+  --route-table-id ${ROUTE_TABLE_ID} \
+  --subnet-id ${SUBNET_ID}
+
+# 17. Create a route to allow external traffic to the Internet through the Internet Gateway
+
+aws ec2 create-route \
+  --route-table-id ${ROUTE_TABLE_ID} \
+  --destination-cidr-block 0.0.0.0/0 \
+  --gateway-id ${INTERNET_GATEWAY_ID}
+```
+
+![route table](./images/11.png)
+
