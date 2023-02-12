@@ -313,3 +313,77 @@ aws ec2 create-key-pair \
   > ssh/${NAME}.id_rsa
 chmod 600 ssh/${NAME}.id_rsa
 ```
+
+***EC2 Instances for Controle Plane (Master Nodes)***
+
+```bash
+# Create 3 Master nodes
+
+for i in 0 1 2; do
+  instance_id=$(aws ec2 run-instances \
+    --associate-public-ip-address \
+    --image-id ${IMAGE_ID} \
+    --count 1 \
+    --key-name ${NAME} \
+    --security-group-ids ${SECURITY_GROUP_ID} \
+    --instance-type t2.micro \
+    --private-ip-address 172.33.0.1${i} \
+    --user-data "name=master-${i}" \
+    --subnet-id ${SUBNET_ID} \
+    --output text --query 'Instances[].InstanceId')
+
+  aws ec2 modify-instance-attribute \
+    --instance-id ${instance_id} \
+    --no-source-dest-check
+
+  aws ec2 create-tags \
+    --resources ${instance_id} \
+    --tags "Key=Name,Value=${NAME}-master-${i}"
+done
+
+```
+
+![master nodes](./images/16.png)
+
+***EC2 Instances for Worker Nodes***
+
+```bash
+# Create 3 worker nodes
+for i in 0 1 2; do
+  instance_id=$(aws ec2 run-instances \
+    --associate-public-ip-address \
+    --image-id ${IMAGE_ID} \
+    --count 1 \
+    --key-name ${NAME} \
+    --security-group-ids ${SECURITY_GROUP_ID} \
+    --instance-type t2.micro \
+    --private-ip-address 172.33.0.2${i} \
+    --user-data "name=worker-${i}|pod-cidr=172.20.${i}.0/24" \
+    --subnet-id ${SUBNET_ID} \
+    --output text --query 'Instances[].InstanceId')
+
+  aws ec2 modify-instance-attribute \
+    --instance-id ${instance_id} \
+    --no-source-dest-check
+
+  aws ec2 create-tags \
+    --resources ${instance_id} \
+    --tags "Key=Name,Value=${NAME}-worker-${i}"
+done
+```
+![worker nodes](./images/17.png)
+
+## Step 3 Prepare The Self-Signed Certificate Authority And Generate TLS Certificates
+
+The following components running on the ***Master*** node will require TLS certificates.
+
+- kube-controller-manager
+- kube-scheduler
+- etcd
+- kube-apiserver
+
+The following components running on the ***Worker*** nodes will require TLS certificates.
+
+- kubelet
+- kube-proxy
+
