@@ -780,7 +780,7 @@ Now, let's generate kubeconfig files for the kubelet, controller manager, kube-p
 
 First, let us create a few environment variables for reuse by multiple commands.
 
-```bah
+```bash
 KUBERNETES_API_SERVER_ADDRESS=$(aws elbv2 describe-load-balancers --load-balancer-arns ${LOAD_BALANCER_ARN} --output text --query 'LoadBalancers[].DNSName')
 ```
 
