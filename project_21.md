@@ -34,12 +34,15 @@ kubectl version --client
 ***ccfssl*** is an open source tool by Cloudflare used to setup a Public Key Infrastructure (PKI Infrastructure) for generating, signing and bundling TLS certificates. In previous projects you have experienced the use of Letsencrypt for the similar use case. Here, cfssl will be configured as a Certificate Authority which will issue the certificates required to spin up a Kubernetes cluster.
 
 ```bash
-# Install go for windows
-choco install go
 
 # Download cfssl, cfssljson and other bundles
-go install github.com/cloudflare/cfssl/cmd/...@latest
+ wget -q --show-progress --https-only --timestamping \
+>   https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/linux/cfssl \
+>   https://storage.googleapis.com/kubernetes-the-hard-way/cfssl/1.4.1/linux/cfssljson
 
+chmod +x cfssl cfssljson
+
+sudo mv cfssl cfssljson /usr/local/bin/
 ```
 
 ![cssl installation](./images/2.png)
@@ -65,6 +68,7 @@ aws ec2 create-tags \
   --resources ${VPC_ID} \
   --tags Key=Name,Value=${NAME}
 ```
+
 ![cssl installation](./images/3.png)
 
 ![cssl installation](./images/4.png)
@@ -992,6 +996,8 @@ done
 ### Bootstrap etcd cluster
 
 SSH into the master nodes
+
+
 
 ```bash
 # Download and install etcd
