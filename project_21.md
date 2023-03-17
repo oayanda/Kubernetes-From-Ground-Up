@@ -57,7 +57,7 @@ mkdir k8s-cluster-from-ground-up
 
 # 2. Create a VPC and store the ID as a variable:
 VPC_ID=$(aws ec2 create-vpc \
---cidr-block 172.33.0.0/16 \
+--cidr-block 172.31.0.0/16 \
 --output text --query 'Vpc.VpcId'
 )
 
@@ -87,8 +87,7 @@ aws ec2 modify-vpc-attribute \
  # 5. Set the required region
  AWS_REGION=eu-central-1
  ```
-![cssl installation](./images/6.png)
- ![cssl installation](./images/5.png)
+
 
 ***Dynamic Host Configuration Protocol – DHCP***
 
@@ -109,7 +108,9 @@ aws ec2 create-tags \
 
 ```
 
-![cssl installation](./images/7.png)
+ ![cssl installation](./images/5.png)
+
+![cssl installation](./images/6.png)
 
 ```bash
 # 8. Associate the DHCP Option set with the VPC:
@@ -118,13 +119,13 @@ aws ec2 associate-dhcp-options \
   --vpc-id ${VPC_ID}
   ```
 
-![cssl installation](./images/8.png)
+![cssl installation](./images/7.png)
 
 ```bash
 # 9 Create the Subnet
 SUBNET_ID=$(aws ec2 create-subnet \
   --vpc-id ${VPC_ID} \
-  --cidr-block 172.33.0.0/24 \
+  --cidr-block 172.31.0.0/24 \
   --output text --query 'Subnet.SubnetId')
 
 # 10. Add tag to Subnet
@@ -133,7 +134,7 @@ aws ec2 create-tags \
   --tags Key=Name,Value=${NAME}
 ```
 
-![cssl installation](./images/9.png)
+![cssl installation](./images/8.png)
 
 ```bash
 # 11. Create the Internet Gateway and attach it to the VPC
@@ -150,7 +151,8 @@ aws ec2 attach-internet-gateway \
   --internet-gateway-id ${INTERNET_GATEWAY_ID} \
   --vpc-id ${VPC_ID}
 ```
-![cssl installation](./images/10.png)
+
+![cssl installation](./images/9.png)
 
 ```bash
 # 14. Create route tables
@@ -179,7 +181,7 @@ aws ec2 create-route \
   --gateway-id ${INTERNET_GATEWAY_ID}
 ```
 
-![route table](./images/11.png)
+![route table](./images/10.png)
 
 
 ***Configure security groups***
@@ -202,12 +204,12 @@ aws ec2 create-tags \
 # Create Inbound traffic for all communication within the subnet to connect on ports used by the master node(s)
 aws ec2 authorize-security-group-ingress \
     --group-id ${SECURITY_GROUP_ID} \
-    --ip-permissions IpProtocol=tcp,FromPort=2379,ToPort=2380,IpRanges='[{CidrIp=172.33.0.0/24}]'
+    --ip-permissions IpProtocol=tcp,FromPort=2379,ToPort=2380,IpRanges='[{CidrIp=172.31.0.0/24}]'
 
 # # Create Inbound traffic for all communication within the subnet to connect on ports used by the worker nodes
 aws ec2 authorize-security-group-ingress \
     --group-id ${SECURITY_GROUP_ID} \
-    --ip-permissions IpProtocol=tcp,FromPort=30000,ToPort=32767,IpRanges='[{CidrIp=172.33.0.0/24}]'
+    --ip-permissions IpProtocol=tcp,FromPort=30000,ToPort=32767,IpRanges='[{CidrIp=172.31.0.0/24}]'
 
 # Create inbound traffic to allow connections to the Kubernetes API Server listening on port 6443
 aws ec2 authorize-security-group-ingress \
@@ -231,7 +233,7 @@ aws ec2 authorize-security-group-ingress \
   --cidr 0.0.0.0/0
 ```
 
-![route table](./images/12.png)
+![route table](./images/11.png)
 
 ***Network Load Balancer***
 
@@ -246,7 +248,8 @@ LOAD_BALANCER_ARN=$(aws elbv2 create-load-balancer \
 --output text --query 'LoadBalancers[].LoadBalancerArn')
 
 ```
-![route table](./images/13.png)
+
+![route table](./images/12.png)
 
 ***Tagret Group***
 
@@ -264,12 +267,12 @@ TARGET_GROUP_ARN=$(aws elbv2 create-target-group \
   --output text --query 'TargetGroups[].TargetGroupArn')
 
  # .21 Register targets - (Just like above, no real targets. You will just put the IP addresses so that, when the nodes become available, they will be used as targets.)
- aws elbv2 register-targets \
+aws elbv2 register-targets \
   --target-group-arn ${TARGET_GROUP_ARN} \
-  --targets Id=172.33.0.1{0,1,2} 
+  --targets Id=172.31.0.1{0,1,2}
 ```
 
-![route table](./images/14.png)
+![route table](./images/13.png)
 
 ```bash
 # 22. Create a listener to listen for requests and forward to the target nodes on TCP port 6443
@@ -282,7 +285,7 @@ aws elbv2 create-listener \
 --output text --query 'Listeners[].ListenerArn'
 ```
 
-![route table](./images/15.png)
+![route table](./images/14.png)
 
 ```bash
 # 23. Get the Kubernetes Public address
@@ -326,15 +329,13 @@ for i in 0 1 2; do
     --key-name ${NAME} \
     --security-group-ids ${SECURITY_GROUP_ID} \
     --instance-type t2.micro \
-    --private-ip-address 172.33.0.1${i} \
+    --private-ip-address 172.31.0.1${i} \
     --user-data "name=master-${i}" \
     --subnet-id ${SUBNET_ID} \
     --output text --query 'Instances[].InstanceId')
-
   aws ec2 modify-instance-attribute \
     --instance-id ${instance_id} \
     --no-source-dest-check
-
   aws ec2 create-tags \
     --resources ${instance_id} \
     --tags "Key=Name,Value=${NAME}-master-${i}"
@@ -342,7 +343,7 @@ done
 
 ```
 
-![master nodes](./images/16.png)
+![master nodes](./images/15.png)
 
 ***EC2 Instances for Worker Nodes***
 
@@ -356,21 +357,20 @@ for i in 0 1 2; do
     --key-name ${NAME} \
     --security-group-ids ${SECURITY_GROUP_ID} \
     --instance-type t2.micro \
-    --private-ip-address 172.33.0.2${i} \
+    --private-ip-address 172.31.0.2${i} \
     --user-data "name=worker-${i}|pod-cidr=172.20.${i}.0/24" \
     --subnet-id ${SUBNET_ID} \
     --output text --query 'Instances[].InstanceId')
-
   aws ec2 modify-instance-attribute \
     --instance-id ${instance_id} \
     --no-source-dest-check
-
   aws ec2 create-tags \
     --resources ${instance_id} \
     --tags "Key=Name,Value=${NAME}-worker-${i}"
 done
 ```
-![worker nodes](./images/17.png)
+
+![worker nodes](./images/16.png)
 
 ## Step 3 Prepare The Self-Signed Certificate Authority And Generate TLS Certificates
 
