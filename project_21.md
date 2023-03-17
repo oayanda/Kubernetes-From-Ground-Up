@@ -440,7 +440,7 @@ cfssl gencert -initca ca-csr.json | cfssljson -bare ca
 }
 ```
 
-![CA files](./images/18.png)
+![CA files](./images/17.png)
 
 ***Generating TLS Certificates For Client and Server***
 
@@ -468,15 +468,15 @@ cat > master-kubernetes-csr.json <<EOF
   "CN": "kubernetes",
    "hosts": [
    "127.0.0.1",
-   "172.33.0.10",
-   "172.33.0.11",
-   "172.33.0.12",
-   "ip-172-33-0-10",
-   "ip-172-33-0-11",
-   "ip-172-33-0-12",
-   "ip-172-33-0-10.${AWS_REGION}.compute.internal",
-   "ip-172-33-0-11.${AWS_REGION}.compute.internal",
-   "ip-172-33-0-12.${AWS_REGION}.compute.internal",
+   "172.31.0.10",
+   "172.31.0.11",
+   "172.31.0.12",
+   "ip-172-31-0-10",
+   "ip-172-31-0-11",
+   "ip-172-31-0-12",
+   "ip-172-31-0-10.${AWS_REGION}.compute.internal",
+   "ip-172-31-0-11.${AWS_REGION}.compute.internal",
+   "ip-172-31-0-12.${AWS_REGION}.compute.internal",
    "${KUBERNETES_PUBLIC_ADDRESS}",
    "kubernetes",
    "kubernetes.default",
@@ -509,7 +509,7 @@ cfssl gencert \
 }
 ```
 
-![CA files](./images/19.png)
+![CA files](./images/18.png)
 
 Next, let's creating the other certificates: for the following Kubernetes components:
 
@@ -628,7 +628,7 @@ Also, Kubernetes uses a special-purpose authorization mode called Node Authorize
 ```bash
 for i in 0 1 2; do
   instance="${NAME}-worker-${i}"
-  instance_hostname="ip-172-33-0-2${i}"
+  instance_hostname="ip-172-31-0-2${i}"
   cat > ${instance}-csr.json <<EOF
 {
   "CN": "system:node:${instance_hostname}",
@@ -733,7 +733,7 @@ cfssl gencert \
 }
 ```
 
-![keys](./images/20.png)
+![keys](./images/19.png)
 
 ## Step 4 – Distributing the Client and Server Certificates
 
@@ -757,7 +757,7 @@ for i in 0 1 2; do
     ca.pem ${instance}-key.pem ${instance}.pem ubuntu@${external_ip}:~/; \
 done
 ```
-![keys](./images/21.png)
+![keys](./images/20.png)
 
 Master or Controller node: – Note that only the api-server related files will be sent over to the master nodes.
 
@@ -772,7 +772,7 @@ instance="${NAME}-master-${i}" \
     master-kubernetes.pem master-kubernetes-key.pem ubuntu@${external_ip}:~/;
 done
 ```
-![keys](./images/22.png)
+![keys](./images/21.png)
 
 The kube-proxy, kube-controller-manager, kube-scheduler, and kubelet client certificates will be used to generate client authentication configuration files later.
 
@@ -794,7 +794,7 @@ KUBERNETES_API_SERVER_ADDRESS=$(aws elbv2 describe-load-balancers --load-balance
 for i in 0 1 2; do
 
 instance="${NAME}-worker-${i}"
-instance_hostname="ip-172-33-0-2${i}"
+instance_hostname="ip-172-31-0-2${i}"
 
  # Set the kubernetes cluster in the kubeconfig file
   kubectl config set-cluster ${NAME} \
@@ -819,8 +819,8 @@ instance_hostname="ip-172-33-0-2${i}"
   kubectl config use-context default --kubeconfig=${instance}.kubeconfig
 done
 ```
-![keys](./images/23.png)
-![keys](./images/24.png)
+![keys](./images/22.png)
+
 
 ```bash
 # 2. Generate the kube-proxy kubeconfig
@@ -949,6 +949,7 @@ instance="${NAME}-master-${i}" \
   kube-scheduler.kubeconfig kube-controller-manager.kubeconfig ubuntu@${external_ip}:~/;
 done
 ```
+![kublet confiig files](./images/23.png)
 
 ## Step 6 Prepare the etcd database for encryption at rest.
 
@@ -956,9 +957,9 @@ Since the etcd is not encryted at rest, we need to mitigate it,
 
 ```bash
 # Generate the encryption key and encode it using base64
-ETCD_ENCRYPTION_KEY=$(head -c 64 /dev/urandom | base64) 
+ETCD_ENCRYPTION_KEY=$(head -c 32 /dev/urandom | base64)
 ```
-![kublet confiig files](./images/26.png)
+![kublet confiig files](./images/24.png)
 
 ***Create an encryption-config.yaml file as documented officially by kubernetes***
 
@@ -973,7 +974,7 @@ resources:
       - aescbc:
           keys:
             - name: key1
-              secret: ${ETCD_ENCRYPTION_KEY}
+              secret: ${ENCRYPTION_KEY}
       - identity: {}
 EOF
 
@@ -991,7 +992,7 @@ instance="${NAME}-master-${i}" \
   encryption-config.yaml ubuntu@${external_ip}:~/;
 done
 ```
-![kublet confiig files](./images/27.png)
+![kublet confiig files](./images/25.png)
 
 ### Bootstrap etcd cluster
 
@@ -1019,7 +1020,7 @@ master_3_ip=$(aws ec2 describe-instances \
 ssh -i k8s-cluster-from-ground-up.id_rsa ubuntu@${master_3_ip}
 ```
 
-![kublet confiig files](./images/28.png)
+![kublet confiig files](./images/26.png)
 
 ```bash
 # Download and install etcd
@@ -1076,7 +1077,7 @@ ExecStart=/usr/local/bin/etcd \\
   --listen-client-urls https://${INTERNAL_IP}:2379,https://127.0.0.1:2379 \\
   --advertise-client-urls https://${INTERNAL_IP}:2379 \\
   --initial-cluster-token etcd-cluster-0 \\
-  --initial-cluster master-0=https://172.33.0.10:2380,master-1=https://172.33.0.11:2380,master-2=https://172.33.0.12:2380 \\
+  --initial-cluster master-0=https://172.31.0.10:2380,master-1=https://172.31.0.11:2380,master-2=https://172.31.0.12:2380 \\
   --cert-file=/etc/etcd/master-kubernetes.pem \\
   --key-file=/etc/etcd/master-kubernetes-key.pem \\
   --peer-cert-file=/etc/etcd/master-kubernetes.pem \\
@@ -1118,7 +1119,9 @@ check staus
 systemctl status etcd
 ```
 
-![kublet confiig files](./images/29.png)
+![kublet confiig files](./images/27.png)
+
+## BOOTSTRAP THE CONTROL PLANE
 
 Create the Kubernetes configuration directory:
 
@@ -1311,4 +1314,81 @@ sudo systemctl status kube-controller-manager
 sudo systemctl status kube-scheduler
 }
 ```
+
+kube-apiserver
+![kublet confiig files](./images/28.png)
+
+kube-controller-manager
+![kublet confiig files](./images/29.png)
+
+kube-scheduler
 ![kublet confiig files](./images/30.png)
+
+Test that Everything is working fine
+
+```bash
+# To get the cluster details run
+kubectl cluster-info  --kubeconfig admin.kubeconfig
+
+# To get the current namespace
+kubectl get namespaces --kubeconfig admin.kubeconfig
+```
+![kublet confiig files](./images/31.png)
+
+To get the status of each component
+
+```bash
+kubectl get componentstatuses --kubeconfig admin.kubeconfig
+```
+![kublet confiig files](./images/32.png)
+
+![kublet confiig files](./images/33.png)
+
+### On one of the controller nodes, configure Role Based Access Control (RBAC) so that the api-server has necessary authorization for for the kubelet.
+
+```bash
+# Create the ClusterRole
+
+cat <<EOF | kubectl apply --kubeconfig admin.kubeconfig -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: system:kube-apiserver-to-kubelet
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/proxy
+      - nodes/stats
+      - nodes/log
+      - nodes/spec
+      - nodes/metrics
+    verbs:
+      - "*"
+EOF
+```
+Create the ClusterRoleBinding to bind the kubernetes user with the role created above
+
+```bash
+cat <<EOF | kubectl --kubeconfig admin.kubeconfig  apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:kube-apiserver
+  namespace: ""
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:kube-apiserver-to-kubelet
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: kubernetes
+EOF
+```
+
+CONFIGURING THE KUBERNETES WORKER NODES
